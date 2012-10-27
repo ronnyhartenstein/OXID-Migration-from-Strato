@@ -3,7 +3,9 @@ OXID-Migration-from-Strato
 
 Blog-Post: http://rh-flow.de/php/2012/daten-migration-von-strato-epages-zu-oxid-eshop-ce
 
-Wer die Aufgabe hat alle Daten von einen Strato ePages Webshop oder Onlineshop zu OXID eShop CE (Community Edition) zu migrieren, wird feststellen, dass man dazu kaum Infos im Netz finden kann. Auch im OXID Forum findet man nur Fragen aber keine Antworten. Klar, gegen Entgeld kann man sich Knowhow einkaufen bzw. auch die Migration machen lassen. Aber das entfällt, da der zu migrierende Shop aktuell noch kaum Gewinn abwirft.
+Wer die Aufgabe hat alle Daten von einen Strato ePages Webshop oder Onlineshop zu OXID eShop CE (Community Edition) zu migrieren, wird feststellen, dass man dazu kaum Infos im Netz finden kann. Auch im OXID Forum findet man nur Fragen aber keine Antworten. Wer nicht Knowhow einkaufen möchte kann selbst aktiv werden.
+
+Update: Das Script unterstützt nun ArtikelVarianten und splittet die SQLs in mehrere Teile auf. Mehr dazu weiter unten im Text bei "Update: ..".
 
 Es gilt also folgende Ansätze zu verfolgen:
 
@@ -193,6 +195,89 @@ REPLACE INTO oxartextends SET OXID = MD5("TS_2289"), OXLONGDESC = "<p>Mein Testa
 Viel Spaß beim Ausprobieren und Verwenden!
 Wer einigermaßen fit in PHP ist wird sich schnell reinfinden und kann das Script auch für andere Quell-Shopsysteme umbauen.
 Gern könnt ihr mir diese dann zuschicken und ich veröffentlich sie hier.
+
+
+Update: Attribute- und Varianten-Migration, SQL-Splitting, Lieferzeiten
+
+Im Rahmen eines Migrations-Auftragen wurde das Script tüchtig weiterentwickelt. Nun werden aus Strato Artikel-Attributen die äquivalenten Artikel-Varianten abgeleitet. Das Kategorie-Parsing wurde zuende geführt - inkl. Kategorie-Bild. Lieferzeiten werden nun auch übernommen.
+
+Die Version 2 des Migrations-Scriptes findet ihr in meinem GitHub-Repository OXID-Migration-from-Strato.
+
+Migration von Artikel-Attributen zu Varianten
+
+Es werden nun aus Artikel-Attributen Varianten gezogen. Dies kann über das Klassen-Property $_attributes gesteuert werden. Es gilt: titel = Attribut-Name,  cols = Attribut-Spalten-Namen in Artikel CSV.
+
+Beispiel:
+
+    protected $_attributes = array(
+        array(
+            'titel' => 'Größe',
+            'cols' => array('Größe/Größe','Art/Größe'),
+        ),
+        array(
+            'titel' => 'Art',
+            'cols' => array('Art/Art','Typ/Art'),
+        ),
+        array(
+            'titel' => 'Schaft',
+            'cols' => array('Art/Schaft'),
+        ),
+
+Die Erstellung erfolgt in _oxarticlesProcessAttributes() und _createAttributes()
+
+protected function _createAttributes()
+    {
+        foreach ($this->_attributes as $attr) {
+            $sets = array(
+                "OXID = MD5('" . $attr['titel'] . "')",
+                "OXTITLE = '" . $attr['titel'] . "'",
+                "OXTITLE_1 = '" . $attr['titel'] . "'",
+                "OXSHOPID = 'oxbaseshop'",
+            );    
+            $sql = "REPLACE INTO oxattribute SET " . join(", ", $sets);
+            file_put_contents($this->_sqlout, $sql . ";\n", FILE_APPEND);
+            print "\n$sql";
+        }
+    }
+
+protected function _oxarticlesProcessAttributes($row)
+    {
+        $map = array(
+            'OXID' => 'MD5(CONCAT("#$col#","#Alias#"))', // $col + #Alias#
+            'OXATTRID' => 'MD5("#$attr[titel]#")', // $attr['titel']
+            'OXOBJECTID' => 'MD5("#Alias#")',
+            'OXVALUE' => '"#$col#"',
+        );
+        $varname = '';
+        foreach ($this->_attributes as $attr) {
+            foreach ($attr['cols'] as $col) {
+                //print "\n attr $col? ".(!empty($row[$col])?1:0);
+                if (!empty($row[$col])) {
+                    $map_curr = $map;
+                    $map_curr['OXID'] = 'MD5(CONCAT("#' . $col . '#","#Alias#"))';
+                    $map_curr['OXATTRID'] = 'MD5("' . $attr['titel'] . '")';
+                    $map_curr['OXVALUE'] = '"#' . $col . '#"';
+                    $sql = $this->_sql('oxobject2attribute', $map_curr, $row);
+                    //print "\n". $sql;
+                    $varname.= (!empty($varname) ? ' | ' : '') . $row[$col];
+                }
+            }
+        }
+        return $varname;
+    }
+
+SQL-Datei-Splitting
+
+Da die SQLs bei umfangreichen Artikelbeständen entsprechend groß werden, müssen diese für den bequemen Import via phpMyAdmin gesplittet werden. Hier ist der klar im Vorteil, der direkt in die DB per Kommandozeile spülen kann. Konnte ich leider nicht, weil der OXID-Ziel-Shop auch bei Strato gehostet wird.
+
+Konfiguration für das Splitting:
+
+    protected $_splitsize = 1024; // kb
+    protected $_splitnum = 1;
+
+ 
+
+
 Zusatz: Variante für nachträgliches Bildernamen migrieren
 
 Problem: Bildnamen müssen in OXID eShop in Kleinschreibung sein, da sie sonst a) nicht erkannt und b) beim Speichern eines Artikels auch gelöscht werden.
