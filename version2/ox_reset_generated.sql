@@ -1,0 +1,1 @@
+UPDATE oxarticles SET  OXPICSGENERATED=0;
