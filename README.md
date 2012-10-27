@@ -1,6 +1,8 @@
 OXID-Migration-from-Strato
 ==========================
 
+Blog-Post: http://rh-flow.de/php/2012/daten-migration-von-strato-epages-zu-oxid-eshop-ce
+
 Wer die Aufgabe hat alle Daten von einen Strato ePages Webshop oder Onlineshop zu OXID eShop CE (Community Edition) zu migrieren, wird feststellen, dass man dazu kaum Infos im Netz finden kann. Auch im OXID Forum findet man nur Fragen aber keine Antworten. Klar, gegen Entgeld kann man sich Knowhow einkaufen bzw. auch die Migration machen lassen. Aber das entfällt, da der zu migrierende Shop aktuell noch kaum Gewinn abwirft.
 
 Es gilt also folgende Ansätze zu verfolgen:
